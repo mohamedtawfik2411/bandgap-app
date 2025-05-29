@@ -8,18 +8,43 @@ import Dans_Diffraction as dif
 from scipy.signal import find_peaks
 import requests
 
-def download_model(url, save_path):
-    if not os.path.exists(save_path):
-        print(f"Downloading {save_path}...")
-        r = requests.get(url, stream=True)
-        with open(save_path, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=8192):
+def download_model_from_gdrive(gdrive_file_id, destination):
+    """Downloads a large Google Drive file using the confirm token trick."""
+    import requests
+
+    URL = "https://docs.google.com/uc?export=download"
+
+    session = requests.Session()
+    response = session.get(URL, params={'id': gdrive_file_id}, stream=True)
+    token = get_confirm_token(response)
+
+    if token:
+        params = {'id': gdrive_file_id, 'confirm': token}
+        response = session.get(URL, params=params, stream=True)
+
+    save_response_content(response, destination)
+    print(f"{destination} downloaded.")
+
+
+def get_confirm_token(response):
+    """Extracts the confirmation token needed for large Google Drive files."""
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            return value
+    return None
+
+
+def save_response_content(response, destination):
+    """Save the content to a file in chunks."""
+    CHUNK_SIZE = 32768
+    with open(destination, "wb") as f:
+        for chunk in response.iter_content(CHUNK_SIZE):
+            if chunk:  # Filter out keep-alive chunks
                 f.write(chunk)
-        print(f"{save_path} downloaded.")
 
 # Load URLs from environment (set on Render later)
-download_model(os.getenv("ORGANIC_MODEL_URL"), "organic_model.h5")
-download_model(os.getenv("INORGANIC_MODEL_URL"), "inorganic_model.h5")
+download_model_from_gdrive(os.getenv("ORGANIC_MODEL_ID"), "organic_model.h5")
+download_model_from_gdrive(os.getenv("INORGANIC_MODEL_ID"), "inorganic_model.h5")
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
