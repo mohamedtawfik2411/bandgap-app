@@ -8,16 +8,36 @@ import Dans_Diffraction as dif
 from scipy.signal import find_peaks
 import requests
 
+
 def download_model(url, path):
     if not os.path.exists(path):
-        print(f"Downloading {path}...")
+        print(f"Downloading {path} from {url}...")
         r = requests.get(url, stream=True)
         with open(path, 'wb') as f:
             for chunk in r.iter_content(8192):
                 f.write(chunk)
+        print(f"{path} downloaded.")
+    else:
+        print(f"{path} already exists. Skipping download.")
+
+def is_valid_h5(filepath):
+    """Check for valid HDF5 signature."""
+    with open(filepath, 'rb') as f:
+        sig = f.read(8)
+        return sig == b'\x89HDF\r\n\x1a\n'
+
+
+# Check if they are valid .h5 files
+if not is_valid_h5("organic_model.h5"):
+    raise Exception("❌ organic_model.h5 is not a valid HDF5 file!")
+if not is_valid_h5("inorganic_model.h5"):
+    raise Exception("❌ inorganic_model.h5 is not a valid HDF5 file!")
+
 
 download_model(os.getenv("ORGANIC_MODEL_URL"), "organic_model.h5")
 download_model(os.getenv("INORGANIC_MODEL_URL"), "inorganic_model.h5")
+
+
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
@@ -26,6 +46,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 organic_model = load_model("organic_model.h5")
 inorganic_model = load_model("inorganic_model.h5")
 scaler_y = joblib.load("scaler_y.pkl")
+print("✅ Models loaded successfully.")
 
 with open("organic_columns.json") as f:
     organic_columns = [float(x) for x in json.load(f)]
